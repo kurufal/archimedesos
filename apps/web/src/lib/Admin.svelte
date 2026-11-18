@@ -2,7 +2,7 @@
   import { tick } from "svelte";
   import { RefreshCw, KeyRound, Trash2 } from "@lucide/svelte";
   import { hosts, logs, security, type UpdateJob } from "./mock";
-  import { demo, hostName, record, notify, refreshUpdates, clearCompletedUpdates } from "./session.svelte";
+  import { demo, hostName, record, notify, refreshUpdates, clearCompletedUpdates, completeUpdate } from "./session.svelte";
   import Table from "./ui/Table.svelte";
   import Toolbar from "./ui/Toolbar.svelte";
   import Badge from "./ui/Badge.svelte";
@@ -63,20 +63,6 @@
     Storage: ["Show volume sizes"],
     "API and security": ["Mask demo identifiers"],
   };
-  function update(item: UpdateJob) {
-    item.status = "Completed";
-    record("Update completed", item.name, item.host);
-    const operation = demo.activities.find(
-      (activity) =>
-        activity.subject === item.name &&
-        activity.host === item.host &&
-        activity.status === "Active",
-    );
-    if (operation) {
-      operation.status = "Completed";
-      operation.progress = 100;
-    }
-  }
   let members = $derived(
     (tab === "API keys" ? demo.keys : security[tab]).filter((item) =>
       Object.values(item).join(" ").toLowerCase().includes(query.toLowerCase()),
@@ -87,7 +73,7 @@
 {#if section === "updates"}<Toolbar bind:query label="Search updates..."
     ><select bind:value={filter} aria-label="Update status"
       ><option value="">All statuses</option
-      >{#each ["Available", "Pending", "In progress", "Completed"] as name}<option
+      >{#each ["Available", "Pending", "In progress", "Completed", "Cancelled"] as name}<option
           >{name}</option
         >{/each}</select
     ><button disabled={!hosts.some(host => host.online && (!demo.host || host.id === demo.host))} onclick={() => refreshUpdates(demo.host)}><RefreshCw size={14}/>Check for updates</button>
@@ -107,8 +93,8 @@
       >{#snippet cell(item, col)}{#if col === "Status"}<Badge
             value={item.status}
           />{:else if col === "Actions"}<button
-            disabled={item.status === "Completed"}
-            onclick={() => update(item)}
+            disabled={item.status === "Completed" || item.status === "Cancelled"}
+            onclick={() => completeUpdate(item)}
             ><RefreshCw size={13} />Mock update</button
           >{:else}{Object.entries(item).find(
             ([key]) => key === col.toLowerCase(),

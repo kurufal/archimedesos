@@ -1,11 +1,20 @@
-export const groups = {
-  Management: ["Dashboard", "Updates", "Projects", "Security", "Systems"],
-  Resources: ["Containers", "Images", "Networks", "Volumes"],
-  Administration: ["Logs", "Settings"],
-};
-export const sections = Object.values(groups)
-  .flat()
-  .map((name) => name.toLowerCase());
+export const navigation = [
+  { section:'Management', label:'Dashboard', route:'/', icon:'LayoutDashboard' },
+  { section:'Management', label:'Updates', route:'/updates/', icon:'Download' },
+  { section:'Management', label:'Projects', route:'/projects/', icon:'FolderGit2' },
+  { section:'Management', label:'Security', route:'/security/', icon:'ShieldCheck' },
+  { section:'Management', label:'Systems', route:'/systems/', icon:'Server' },
+  { section:'Resources', label:'Containers', route:'/containers/', icon:'Box' },
+  { section:'Resources', label:'Images', route:'/images/', icon:'Layers' },
+  { section:'Resources', label:'Networks', route:'/networks/', icon:'Network' },
+  { section:'Resources', label:'Volumes', route:'/volumes/', icon:'Database' },
+  { section:'Tools', label:'Files', route:'/files/', icon:'FolderOpen' },
+  { section:'Tools', label:'Terminal', route:'/terminal/', icon:'Terminal' },
+  { section:'Administration', label:'Logs', route:'/logs/', icon:'ScrollText' },
+  { section:'Administration', label:'Settings', route:'/settings/', icon:'Settings' },
+] as const;
+export const groups = Object.fromEntries([...new Set(navigation.map(item => item.section))].map(section => [section, navigation.filter(item => item.section === section)]));
+export const sections = navigation.map(item => item.route.slice(1,-1)).filter(section => section && section !== 'files' && section !== 'terminal');
 export type Host = {
   id: string;
   name: string;
@@ -130,6 +139,15 @@ export interface Container {
   ports: string;
   uptime: string;
 }
+export const resourceId = (host: string, name: string) => JSON.stringify([host, name]);
+export const projectMembers = (project: Pick<Project, 'host' | 'name'>, items: Container[]) => items.filter(item => resourceId(item.host, item.project) === resourceId(project.host, project.name));
+export function projectHealth(items: Container[]) {
+  if (!items.length) return 'Missing';
+  if (items.every(item => item.status === 'Running')) return 'Healthy';
+  if (items.every(item => item.status === 'Stopped')) return 'Stopped';
+  if (items.some(item => item.status === 'Unhealthy' || item.status === 'Restarting')) return 'Degraded';
+  return 'Partially running';
+}
 const services = [
   ["traefik", "redis", "whoami"],
   ["grafana", "prometheus", "loki", "node-exporter"],
@@ -240,12 +258,15 @@ export interface Activity {
   name: string;
   subject: string;
   host: string;
-  status: string;
+  status: 'Active' | 'Queued' | 'Completed' | 'Failed' | 'Cancelled';
   progress: number;
   time: string;
   total?: number;
   speed?: number;
   art?: string;
+  startedAt?: number;
+  finishedAt?: number;
+  update?: Pick<UpdateJob,'host'|'name'|'version'|'type'>;
 }
 export const activities: Activity[] = [
   {
@@ -268,6 +289,7 @@ export const activities: Activity[] = [
     status: "Active",
     progress: 32,
     time: "09:41:12",
+    update: {host:'compute',name:'systemd',type:'System package',version:'257'},
   },
   {
     id: 4,
@@ -344,7 +366,7 @@ export const security = {
   Audit: [{ name: "09:32:26", role: "Demo operator", scope: "Image updated" }],
 };
 export function workspace(project: Project) {
-  const members = containers.filter((item) => item.project === project.name);
+  const members = projectMembers(project, containers);
   return {
     "compose.yaml":
       "services:\n" +

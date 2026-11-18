@@ -1,10 +1,10 @@
 import {expect, test} from '@playwright/test';
-import {groups,hosts,totals} from '../src/lib/mock';
+import {navigation,hosts,totals} from '../src/lib/mock';
 
 test('all sidebar routes load directly without client errors',async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));
-  for(const name of Object.values(groups).flat()){
-    const response=await page.goto(name==='Dashboard'?'/':`/${name.toLowerCase()}/`);
+  for(const {label:name,route} of navigation){
+    const response=await page.goto(route);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading',{name,level:1,exact:true})).toBeVisible();
   }
@@ -92,7 +92,10 @@ test('activity cleanup removes cancelled rows and confirms host-scoped clear all
   await page.keyboard.press('Escape');
   await page.getByLabel('Active system').selectOption('compute');
   await page.getByRole('button',{name:/Activity \d/}).click();
-  await expect(drawer.locator('article').filter({hasText:'System package update'})).toBeVisible();
+  const systemUpdate = drawer.locator('article').filter({hasText:'System package update'});
+  await systemUpdate.getByRole('button',{name:/Details for/}).click();
+  await expect(systemUpdate.locator('dl')).toContainText('systemd · 257');
+  await expect(systemUpdate.locator('dl')).toContainText('Elapsed');
 });
 
 test('updates refresh respects the selected host and cleared versions', async ({page}) => {
@@ -108,6 +111,29 @@ test('updates refresh respects the selected host and cleared versions', async ({
   await expect(page.getByRole('row').filter({hasText:'systemd'})).toContainText('In progress');
   await page.getByLabel('Active system').selectOption('core');
   await expect(page.getByRole('row').filter({hasText:'redis'})).toContainText('Completed');
+});
+
+test('activity cleanup leaves live work alone and update cancellation stays linked', async ({page}) => {
+  await page.goto('/updates/');
+  await page.getByRole('button',{name:/Activity \d/}).click();
+  const drawer = page.getByRole('dialog');
+  const operation = drawer.locator('article').filter({hasText:'System package update'});
+  page.once('dialog',prompt => prompt.accept());
+  await drawer.getByRole('button',{name:'Clear all'}).click();
+  await expect(operation).toContainText('Active');
+  await expect(drawer.locator('article').filter({hasText:'Project deployment'})).toContainText('Queued');
+  await operation.getByTitle('Cancel').click();
+  await page.keyboard.press('Escape');
+  const job = page.getByRole('row').filter({hasText:'systemd'});
+  await expect(job).toContainText('Cancelled');
+  await expect(job.getByRole('button',{name:'Mock update'})).toBeDisabled();
+  await page.getByRole('button',{name:/Activity \d/}).click();
+  await operation.getByTitle('Retry').click();
+  await page.keyboard.press('Escape');
+  await job.getByRole('button',{name:'Mock update'}).click();
+  await page.getByRole('button',{name:/Activity \d/}).click();
+  await expect(operation).toContainText('Completed');
+  await expect(drawer.locator('article').filter({hasText:'systemd'})).toHaveCount(1);
 });
 
 test('responsive keyboard navigation and bulk container action',async({page})=>{
@@ -168,4 +194,102 @@ test('project service inspector follows selection and preserves configuration dr
   await page.getByRole('button',{name:'Configuration',exact:true}).click();
   await expect(editor).toContainText('# draft');
   await expect(page.locator('.editor-status')).toContainText('1 unsaved');
+});
+
+test('workspace keeps an active draft through rename and falls back after confirmed delete', async ({page}) => {
+  await page.goto('/projects/');
+  await page.getByRole('button',{name:'Open workspace'}).first().click();
+  await page.getByRole('button',{name:'config',exact:true}).click();
+  await page.getByRole('button',{name:'app.json',exact:true}).click();
+  await page.getByRole('textbox',{name:'Edit config/app.json'}).fill('{"draft":true}');
+  await page.getByRole('button',{name:'Rename',exact:true}).click();
+  await page.getByLabel('Workspace path').fill('config/renamed.json');
+  await page.getByRole('button',{name:'Confirm rename'}).click();
+  await expect(page.getByRole('textbox',{name:'Edit config/renamed.json'})).toContainText('{"draft":true}');
+  await page.getByRole('button',{name:'Delete',exact:true}).click();
+  await page.getByRole('button',{name:'Confirm delete'}).click();
+  await expect(page.getByRole('textbox',{name:'Edit compose.yaml'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'renamed.json',exact:true})).toHaveCount(0);
+});
+
+test('Files remembers navigation, edits and transfers within an isolated mock host', async ({page}) => {
+  await page.goto('/files/');
+  const rail = page.getByRole('navigation',{name:'Locations'});
+  const location = page.getByRole('textbox',{name:'Location path'});
+  const actions = page.getByTitle('File actions');
+  await rail.getByRole('button',{name:'Documents',exact:true}).click();
+  await expect(location).toHaveValue('/home/demo/Documents');
+  await page.getByTitle('Back',{exact:true}).click();
+  await expect(location).toHaveValue('/home/demo');
+  await page.getByTitle('Forward',{exact:true}).click();
+  await page.getByTitle('New file',{exact:true}).click();
+  await page.getByRole('dialog').getByLabel('Name',{exact:true}).fill('notes.txt');
+  await page.getByRole('button',{name:'Confirm new file'}).click();
+  const notes = page.getByRole('button',{name:'notes.txt',exact:true});
+  await notes.dblclick();
+  const editor = page.getByRole('textbox',{name:'Edit /home/demo/Documents/notes.txt'});
+  await page.getByRole('button',{name:'Edit',exact:true}).click();
+  await editor.fill('host-local file draft');
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.keyboard.press('Escape');
+  await expect(editor).toContainText('host-local file draft');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await notes.click({button:'right'});
+  await page.getByRole('button',{name:'Copy',exact:true}).click();
+  await rail.getByRole('button',{name:'Downloads',exact:true}).click();
+  await actions.click();
+  await page.getByRole('button',{name:'Paste',exact:true}).click();
+  await page.getByTitle('Details view').click();
+  await expect(page.getByRole('row').filter({hasText:'notes.txt'})).toContainText('21 B');
+  await page.getByTitle('New folder',{exact:true}).click();
+  await page.getByRole('dialog').getByLabel('Name',{exact:true}).fill('Archive');
+  await page.getByRole('button',{name:'Confirm new folder'}).click();
+  const archive = page.getByRole('button',{name:'Archive',exact:true});
+  await notes.dragTo(archive);
+  await expect(notes).toHaveCount(0);
+  await archive.dblclick();
+  await notes.press('F2');
+  await page.getByRole('dialog').getByLabel('Name',{exact:true}).fill('renamed.txt');
+  await page.getByRole('button',{name:'Confirm rename'}).click();
+  await expect(page.getByRole('button',{name:'renamed.txt',exact:true})).toBeVisible();
+  await page.getByLabel('Active system').selectOption('compute');
+  await expect(location).toHaveValue('/home/operator');
+  await rail.getByRole('button',{name:'Downloads',exact:true}).click();
+  await expect(notes).toHaveCount(0);
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('Terminal preserves each xterm and its own transcript while switching tabs', async ({page}) => {
+  await page.goto('/terminal/');
+  await page.getByRole('button',{name:'New tab'}).click();
+  const output = page.locator('.xterm-rows:visible');
+  const terminal = page.locator('.xterm:visible');
+  await expect(output).toContainText('Demo terminal: Archimedes Core');
+  const firstRenderer = await terminal.elementHandle();
+  await page.keyboard.type('hostname'); await page.keyboard.press('Enter');
+  await expect(output).toContainText('$ hostname');
+  await page.getByTitle('Rename tab').click();
+  await page.getByLabel('Tab name').fill('Local demo');
+  await page.getByRole('dialog').getByRole('button',{name:'Rename'}).click();
+  await page.getByLabel('New session target').selectOption('host:compute');
+  await page.getByRole('button',{name:'New tab'}).click();
+  await expect(output).toContainText('Demo terminal: Compute Node');
+  await expect(output).not.toContainText('$ hostname');
+  await page.getByRole('button',{name:'Local demo',exact:true}).click();
+  await expect(output).toContainText('$ hostname');
+  await expect(terminal).toHaveCount(1);
+  await expect(page.locator('.xterm')).toHaveCount(2);
+  expect(await terminal.evaluate((element, first) => element === first, firstRenderer)).toBe(true);
+  await page.setViewportSize({width:390,height:844});
+  await expect(page.locator('.terminal-status')).toContainText(/Demo session · [1-9]\d* × [1-9]\d*/);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByTitle('Close Local demo').click();
+  expect(await firstRenderer?.evaluate(element => element.isConnected)).toBe(false);
+  await expect(output).toContainText('Demo terminal: Compute Node');
+  await expect(page.locator('.xterm')).toHaveCount(1);
+  await page.getByTitle('Clear terminal').click();
+  await expect(output).not.toContainText('Demo terminal: Compute Node');
 });

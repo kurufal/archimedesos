@@ -14,6 +14,8 @@
     Database,
     ScrollText,
     Settings,
+    FolderOpen,
+    Terminal,
     PanelLeftClose,
     PanelLeftOpen,
     Activity as Pulse,
@@ -24,12 +26,12 @@
     Check,
     Monitor,
   } from "@lucide/svelte";
-  import { groups, hosts } from "$lib/mock";
+  import { groups, hosts, navigation } from "$lib/mock";
   import { demo, defaultSettings } from "$lib/session.svelte";
   import Activity from "$lib/Activity.svelte";
   import "../theme.css";
   let { children } = $props();
-  const icons = [
+  const icons = {
     LayoutDashboard,
     Download,
     FolderGit2,
@@ -41,15 +43,11 @@
     Database,
     ScrollText,
     Settings,
-  ];
-  const names = Object.values(groups).flat();
-  let route = $derived(page.url.pathname.split("/")[1] || "dashboard");
-  let current = $derived(
-    names.find((name) => name.toLowerCase() === route) ?? "Dashboard",
-  );
-  let group = $derived(
-    Object.entries(groups).find(([, items]) => items.includes(current))?.[0],
-  );
+    FolderOpen, Terminal,
+  };
+  let activeEntry = $derived(navigation.find(item => item.route === page.url.pathname));
+  let current = $derived(activeEntry?.label ?? 'ArchimedesOS');
+  let group = $derived(activeEntry?.section);
   let mobile = $state(false),
     ready = $state(false);
   let main: HTMLElement;
@@ -121,12 +119,11 @@
     >
     <nav aria-label="Main navigation">
       {#each Object.entries(groups) as [section, items]}<div class="navgroup">
-          <small>{section}</small>{#each items as item}{@const Icon =
-              icons[names.indexOf(item)]}<a
-              title={item}
-              href={item === "Dashboard" ? "/" : `/${item.toLowerCase()}/`}
-              aria-current={current === item ? "page" : undefined}
-              ><Icon size={17} /><span>{item}</span>{#if item==='Updates' && demo.settings['Notify about available updates']}<b class="count">{demo.updates.filter(job=>job.status==='Available'&&(!demo.host||job.host===demo.host)).length}</b>{/if}</a
+            <small>{section}</small>{#each items ?? [] as item}{@const Icon = icons[item.icon]}<a
+              title={item.label}
+              href={item.route}
+              aria-current={activeEntry === item ? "page" : undefined}
+              ><Icon size={17} /><span>{item.label}</span>{#if item.label==='Updates' && demo.settings['Notify about available updates']}<b class="count">{demo.updates.filter(job=>job.status==='Available'&&(!demo.host||job.host===demo.host)).length}</b>{/if}</a
             >{/each}
         </div>{/each}
     </nav>

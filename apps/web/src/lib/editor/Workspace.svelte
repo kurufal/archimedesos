@@ -22,12 +22,13 @@
     ChevronRight,
     Eye,
   } from "@lucide/svelte";
-  import type { Project } from "../mock";
+  import { resourceId, type Project } from "../mock";
   import { demo, notify, record } from "../session.svelte";
   import Modal from "../ui/Modal.svelte";
   import { parseDocument } from "yaml";
   let { project }: { project: Project } = $props();
-  let files = $derived(demo.files[project.name]);
+  let projectId = $derived(resourceId(project.host, project.name));
+  let files = $derived(demo.files[projectId]);
   let drafts = $state<Record<string, string>>({}),
     opened = $state(["compose.yaml"]),
     current = $state("compose.yaml"),
@@ -53,7 +54,7 @@
               .join("/"),
           ),
       ),
-      ...demo.directories[project.name],
+      ...demo.directories[projectId],
     ]),
   ]);
   let dirty = $derived(
@@ -190,13 +191,14 @@
         command === "Delete"
           ? list.filter((entry) => !affected(entry))
           : list.map((entry) => (affected(entry) ? remap(entry) : entry));
-      demo.directories[project.name] = update(demo.directories[project.name]);
+      demo.directories[projectId] = update(demo.directories[projectId]);
       expanded = update(expanded);
       opened = update(opened);
+      if (command === 'Rename' && affected(current)) current = remap(current);
       current = opened.includes(current) ? current : (opened.at(-1) ?? "");
       selected = command === "Rename" ? path : current;
     } else if (command === "New folder") {
-      demo.directories[project.name].push(path);
+      demo.directories[projectId].push(path);
       expanded.push(path);
       selected = path;
     } else if (command === "New file" || command === "Upload") {

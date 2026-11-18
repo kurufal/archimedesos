@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ArrowLeft, FolderGit2, UploadCloud } from "@lucide/svelte";
-  import { projects, type Project } from "./mock";
+  import { projects, projectMembers, projectHealth, resourceId, type Project } from "./mock";
   import { demo, hostName, record } from "./session.svelte";
   import Table from "./ui/Table.svelte";
   import Toolbar from "./ui/Toolbar.svelte";
@@ -19,15 +19,11 @@
     ),
   );
   function info(item: Project) {
-    const members = demo.containers.filter(
-      (container) => container.project === item.name,
-    );
+    const members = projectMembers(item, demo.containers);
     return {
       Name: item.name,
       Host: hostName(item.host),
-      Status: members.every((container) => container.status === "Running")
-        ? "Healthy"
-        : "Degraded",
+      Status: projectHealth(members),
       Services: members.length,
       Running: members.filter((container) =>
         ["Running", "Unhealthy"].includes(container.status),
@@ -117,11 +113,11 @@
       <dt>Connection</dt>
       <dd>Not connected · preview only</dd>
       <dt>Last backup</dt>
-      <dd>{demo.backups[item.name] ?? "No demo backup yet"}</dd>
+      <dd>{demo.backups[resourceId(item.host,item.name)] ?? "No demo backup yet"}</dd>
     </dl>
     <button
       onclick={() => {
         record("Backup preview", item.name, item.host);
-        demo.backups[item.name] = demo.activities[0].time + " UTC (demo)";
+        demo.backups[resourceId(item.host,item.name)] = demo.activities[0].time + " UTC (demo)";
       }}>Preview backup</button
     >{/if}{/if}

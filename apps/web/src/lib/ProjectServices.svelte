@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Box, FolderTree, Play, Square, RotateCw, Terminal } from '@lucide/svelte';
-  import { serviceProcesses, type Project } from './mock';
+  import { projectMembers, serviceProcesses, type Project } from './mock';
   import { demo, hostName, operate } from './session.svelte';
   import Badge from './ui/Badge.svelte';
 
@@ -9,7 +9,7 @@
   const actions = [['Start', Play], ['Stop', Square], ['Restart', RotateCw]] as const;
   let selected = $state(''), view = $state('Overview'), command = $state('');
   let transcripts = $state<Record<string,string[]>>({});
-  let services = $derived(demo.containers.filter(item => item.host === project.host && item.project === project.name));
+  let services = $derived(projectMembers(project, demo.containers));
   let service = $derived(services.find(item => item.name === selected) ?? services[0]);
   let entries = $derived(service ? demo.containerLogs.filter(entry => entry.host === service.host && entry.message.startsWith(service.name + ':')) : []);
   let processes = $derived(service ? serviceProcesses(service) : []);

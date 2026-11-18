@@ -4,7 +4,6 @@
     Trash2,
     Pencil,
     Download,
-    RefreshCw,
     Plus,
   } from "@lucide/svelte";
   import { hosts } from "./mock";
@@ -91,13 +90,20 @@
     error = "";
   }
   function remove(row: Row) {
+    const current = inventory.find(item => item.host === row.host && item.name === row.name);
     const fixture = demo[kind].findIndex(
       (item) => item.name === row.name && item.host === row.host,
     );
-    if (fixture >= 0 && !row.attached.length) demo[kind].splice(fixture, 1);
+    if (fixture < 0 || !current || current.attached.length) return false;
+    demo[kind].splice(fixture, 1);
+    return true;
   }
   function apply() {
     const value = name.trim();
+    if (!hosts.some(host => host.id === target && host.online)) {
+      error = 'This demo system is unavailable.';
+      return;
+    }
     if (["Create", "Pull", "Edit"].includes(command)) {
       if (
         !value ||
@@ -115,7 +121,9 @@
         const network = demo.networks.find(
           (item) => item.name === selected?.name && item.host === target,
         );
-        if (network) network.name = value;
+        if (!network) { error = 'Network no longer exists.'; return; }
+        if (network.name === value) { error = 'Enter a different name.'; return; }
+        network.name = value;
       } else if (kind === "volumes") {
         demo.volumes.push({
           name: value,
@@ -126,7 +134,9 @@
           container: "",
         });
       } else if (kind === "networks") {
-        const index = 30 + demo.networks.length;
+        const used = new Set(demo.networks.filter(network => network.host === target).map(network => network.subnet));
+        const index = Array.from({length:225},(_,offset) => offset + 30).find(octet => !used.has(`172.${octet}.0.0/16`));
+        if (index === undefined) { error = 'No demo subnets are available.'; return; }
         demo.networks.push({
           name: value,
           host: target,
@@ -157,11 +167,13 @@
           created: new Date().toISOString().slice(0, 10),
         });
       }
-    } else if (command === "Remove" && selected) remove(selected);
-    else if (command === "Prune")
-      inventory
-        .filter((item) => item.host === target && !item.attached.length)
-        .forEach(remove);
+    } else if (command === 'Remove') {
+      if (!selected || !remove(selected)) { error = 'Resource no longer exists or is in use.'; return; }
+    } else if (command === 'Prune') {
+      const candidates = inventory.filter(item => item.host === target && !item.attached.length);
+      if (!candidates.length) { error = 'No unused resources to remove.'; return; }
+      candidates.forEach(remove);
+    } else return;
     record(
       `${kind} ${command.toLowerCase()}`,
       value || hostName(target),
@@ -172,7 +184,6 @@
   const icons = {
     Inspect: Eye,
     Remove: Trash2,
-    Update: RefreshCw,
     Edit: Pencil,
   };
 </script>
@@ -205,7 +216,7 @@
       >{:else if col === "Usage"}<Badge
         value={item.fields[col]}
       />{:else if col === "Actions"}<div class="actions">
-        {#each Object.entries(icons).filter(([action]) => (action !== "Edit" || kind === "networks") && (action !== "Update" || kind === "images")) as [action, Icon]}<button
+        {#each Object.entries(icons).filter(([action]) => action !== "Edit" || kind === "networks") as [action, Icon]}<button
             class="icon"
             title={action + " " + item.name}
             disabled={action === "Remove" && !!item.attached.length}

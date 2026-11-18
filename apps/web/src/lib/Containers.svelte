@@ -9,7 +9,7 @@
     ScrollText,
   } from "@lucide/svelte";
   import { demo, hostName, operate } from "./session.svelte";
-  import { projects, type Container } from "./mock";
+  import { projects, resourceId, type Container } from "./mock";
   import Badge from "./ui/Badge.svelte";
   import Table from "./ui/Table.svelte";
   import Toolbar from "./ui/Toolbar.svelte";
@@ -26,14 +26,16 @@
       (item) =>
         (!demo.host || item.host === demo.host) &&
         (!status || item.status === status) &&
-        (!(project || group) || item.project === (project || group)) &&
+        (!project || item.project === project) &&
+        (!group || resourceId(item.host,item.project) === group) &&
         [item.name, item.image, hostName(item.host)]
           .join(" ")
           .toLowerCase()
-          .includes(query.toLowerCase()),
+          .includes(query.toLowerCase())
     ),
   );
-  let picked = $derived(rows.filter((item) => selection.includes(item.name)));
+  const id = (item: Container) => resourceId(item.host, item.name);
+  let picked = $derived(rows.filter((item) => selection.includes(id(item))));
   const commands = [
     ["Start", Play],
     ["Stop", Square],
@@ -72,8 +74,8 @@
         >{name}</option
       >{/each}</select
   >{#if !project}<select aria-label="Compose project" bind:value={group}
-      ><option value="">All projects</option>{#each projects as item}<option
-          >{item.name}</option
+        ><option value="">All projects</option>{#each projects.filter(item => !demo.host || item.host === demo.host) as item}<option value={resourceId(item.host,item.name)}
+          >{item.name} · {hostName(item.host)}</option
         >{/each}</select
     >{/if}</Toolbar
 >
@@ -81,11 +83,11 @@
   {#snippet checkbox(item: Container)}<input
       type="checkbox"
       aria-label={"Select " + item.name}
-      checked={selection.includes(item.name)}
+      checked={selection.includes(id(item))}
       onchange={(event) =>
         (selection = event.currentTarget.checked
-          ? [...selection, item.name]
-          : selection.filter((name) => name !== item.name))}
+          ? [...selection, id(item)]
+          : selection.filter((key) => key !== id(item)))}
     />{/snippet}
   {#snippet actions(item: Container)}<div class="actions">
       {#each commands as [name, Icon]}<button
@@ -173,20 +175,20 @@
           null,
           2,
         )}</pre>{:else if tab === "Logs"}<pre>{demo.containerLogs
-          .filter((log) => log.message.startsWith(item.name + ":"))
+          .filter((log) => log.host === item.host && log.message.startsWith(item.name + ":"))
           .map((log) => log.time + " " + log.message)
           .join(
             "\n",
           )}</pre>{:else if tab === "Terminal"}<pre>Demo terminal · no shell connected</pre>{:else if tab === "Environment"}<pre>{demo.files[
-          item.project
+          resourceId(item.host,item.project)
         ]?.[".env"]?.replace(
           /=.*/g,
           "=********",
         )}</pre>{:else if tab === "Mounts"}<pre>{demo.volumes
-          .filter((volume) => volume.container === item.name)
+          .filter((volume) => volume.host === item.host && volume.container === item.name)
           .map((volume) => volume.mountpoint)
           .join("\n") || "No mounts"}</pre>{:else}<pre>{demo.networks
-          .filter((network) => network.project === item.project)
+          .filter((network) => network.host === item.host && network.project === item.project)
           .map((network) => network.name + " · " + network.subnet)
           .join("\n") || "No networks"}</pre>{/if}</Modal
   >{/if}
