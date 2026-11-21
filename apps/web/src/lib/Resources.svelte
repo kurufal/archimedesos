@@ -6,8 +6,8 @@
     Download,
     Plus,
   } from "@lucide/svelte";
-  import { hosts } from "./mock";
   import { demo, hostName, record } from "./session.svelte";
+  import { connection } from "./connection.svelte";
   import Table from "./ui/Table.svelte";
   import Toolbar from "./ui/Toolbar.svelte";
   import Modal from "./ui/Modal.svelte";
@@ -100,7 +100,7 @@
   }
   function apply() {
     const value = name.trim();
-    if (!hosts.some(host => host.id === target && host.online)) {
+    if (!demo.hosts.some(host => host.id === target && host.online)) {
       error = 'This demo system is unavailable.';
       return;
     }
@@ -194,12 +194,13 @@
       >Unused</option
     ></select
   ><button
+    disabled={connection.mode !== "demo"}
     class="primary"
     onclick={() => begin(kind === "images" ? "Pull" : "Create")}
     >{#if kind === "images"}<Download size={14} />Pull image{:else}<Plus
         size={14}
       />Create {kind.slice(0, -1)}{/if}</button
-  >{#if kind !== "networks"}<button onclick={() => begin("Prune")}
+  >{#if kind !== "networks"}<button disabled={connection.mode !== "demo"} onclick={() => begin("Prune")}
       ><Trash2 size={14} />Prune unused</button
     >{/if}</Toolbar
 >
@@ -219,7 +220,7 @@
         {#each Object.entries(icons).filter(([action]) => action !== "Edit" || kind === "networks") as [action, Icon]}<button
             class="icon"
             title={action + " " + item.name}
-            disabled={action === "Remove" && !!item.attached.length}
+            disabled={connection.mode !== "demo" && action !== "Inspect" || action === "Remove" && !!item.attached.length}
             onclick={() => begin(action, item)}><Icon size={14} /></button
           >{/each}
       </div>{:else}{item.fields[col]}{/if}{/snippet}</Table
@@ -239,7 +240,7 @@
           >Demo system<select
             bind:value={target}
             disabled={!!selected || !!demo.host}
-            >{#each hosts as host}<option value={host.id}>{host.name}</option
+            >{#each demo.hosts as host}<option value={host.id}>{host.name}</option
               >{/each}</select
           ></label
         >{#if ["Create", "Pull", "Edit"].includes(command)}<label class="stack"

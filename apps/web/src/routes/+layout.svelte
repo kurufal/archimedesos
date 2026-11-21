@@ -26,8 +26,9 @@
     Check,
     Monitor,
   } from "@lucide/svelte";
-  import { groups, hosts, navigation } from "$lib/mock";
-  import { demo, defaultSettings } from "$lib/session.svelte";
+  import { groups, navigation } from "$lib/mock";
+  import { demo, defaultSettings, applyInventory } from "$lib/session.svelte";
+  import { connection, connectInventory, disconnectInventory } from "$lib/connection.svelte";
   import Activity from "$lib/Activity.svelte";
   import "../theme.css";
   let { children } = $props();
@@ -66,7 +67,9 @@
       demo.views = prefs.views ?? {};
       demo.settings = { ...defaultSettings, ...prefs.settings };
     } catch {}
+    connectInventory(applyInventory);
     ready = true;
+    return disconnectInventory;
   });
   $effect(() => {
     if (ready) {
@@ -128,7 +131,7 @@
         </div>{/each}
     </nav>
     <div class="sidefoot">
-      <span class="demo-dot"></span><span>Demo workspace</span><button
+      <span class:demo-dot={connection.mode === "demo"} class:online-dot={connection.status === "connected"}></span><span>{connection.mode === "demo" ? "Demo workspace" : "Local inventory"}</span><button
         class="icon"
         title="Toggle sidebar"
         onclick={() => (demo.collapsed = !demo.collapsed)}
@@ -150,7 +153,7 @@
         ><Monitor size={15} /><select
           aria-label="Active system"
           bind:value={demo.host}
-          ><option value="">All systems</option>{#each hosts as host}<option
+          ><option value="">All systems</option>{#each demo.hosts as host}<option
               value={host.id}>{host.name}</option
             >{/each}</select
         ></label
@@ -159,12 +162,14 @@
       >
     </div>
     <main id="content" tabindex="-1" bind:this={main} aria-busy={!!navigating.to}>
+      {#if connection.mode === "live" && connection.status === "connecting"}<p class="connection-state" role="status">Connecting to local middleware...</p>{/if}
+      {#if connection.mode === "live" && connection.status === "error"}<p class="connection-state error" role="alert"><b>Live inventory unavailable.</b> {connection.error} Demo data was not substituted.</p>{/if}
       {#if navigating.to}<progress aria-label="Loading page"></progress>{/if}
       {@render children()}
     </main>
     <footer>
-      <span><i class="demo-dot"></i> Demo environment</span><span
-        ><FlaskConical size={12} /> Simulated data</span
+      <span><i class:demo-dot={connection.mode === 'demo'} class:online-dot={connection.status === 'connected'}></i> {connection.mode === "demo" ? "Demo environment" : `Local ${connection.status}`}</span><span
+        >{#if connection.mode === "demo"}<FlaskConical size={12} /> Simulated data{:else}<Monitor size={12} /> Local provider{/if}</span
       >
     </footer>
   </div>
@@ -188,3 +193,14 @@
 {#if demo.toast}<div role="status" class="toast">
     <Check size={16} />{demo.toast}
   </div>{/if}
+
+<style>
+  .connection-state {
+    margin: 0 0 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .connection-state.error { border-color: var(--red); color: var(--red); }
+  .online-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+</style>

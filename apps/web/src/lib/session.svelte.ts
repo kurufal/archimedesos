@@ -1,5 +1,8 @@
 import * as seed from "./mock";
+import { inventoryProvider } from "./connection.svelte";
+import type { InventorySnapshot } from "../../../../shared/contracts";
 export const defaultSettings = { "Show host addresses": true, "Show volume sizes": true };
+const useDemoInventory = inventoryProvider === "demo";
 const sessionStart = Date.now();
 const demoDay = Date.parse('2026-11-17T00:00:00Z');
 export const activityNow = () => demoDay + (9 * 3600 + 43 * 60) * 1000 + Date.now() - sessionStart;
@@ -15,11 +18,12 @@ export const demo = $state({
   activity: false,
   views: {} as Record<string, string>,
   toast: "",
-  containers: structuredClone(seed.containers),
+  hosts: useDemoInventory ? structuredClone(seed.hosts) : [] as typeof seed.hosts,
+  containers: useDemoInventory ? structuredClone(seed.containers) : [] as typeof seed.containers,
   containerLogs: seed.logs.filter(entry => entry.source === 'Container').map(entry => ({...entry})),
-  images: structuredClone(seed.images),
-  volumes: structuredClone(seed.volumes),
-  networks: structuredClone(seed.networks),
+  images: useDemoInventory ? structuredClone(seed.images) : [] as typeof seed.images,
+  volumes: useDemoInventory ? structuredClone(seed.volumes) : [] as typeof seed.volumes,
+  networks: useDemoInventory ? structuredClone(seed.networks) : [] as typeof seed.networks,
   updates: structuredClone(seed.updates),
   clearedVersions: [] as string[],
   updateChecks: {} as Record<string, string>,
@@ -34,7 +38,14 @@ export const demo = $state({
   directories: Object.fromEntries(seed.projects.map(project => [seed.resourceId(project.host, project.name), [] as string[]])),
 });
 export const hostName = (id: string) =>
-  seed.hosts.find((host) => host.id === id)?.name ?? id;
+  demo.hosts.find((host) => host.id === id)?.name ?? id;
+export function applyInventory(snapshot: InventorySnapshot) {
+  demo.hosts = structuredClone(snapshot.hosts) as typeof seed.hosts;
+  demo.containers = structuredClone(snapshot.containers) as typeof seed.containers;
+  demo.images = structuredClone(snapshot.images) as typeof seed.images;
+  demo.networks = structuredClone(snapshot.networks) as typeof seed.networks;
+  demo.volumes = structuredClone(snapshot.volumes) as typeof seed.volumes;
+}
 const versionKey = (job: Pick<seed.UpdateJob,'host'|'type'|'name'|'version'>) => JSON.stringify([job.host, job.type, job.name, job.version]);
 let nextActivityId = Math.max(...seed.activities.map(item => item.id)) + 1;
 export function clearCompletedUpdates(host: string) {

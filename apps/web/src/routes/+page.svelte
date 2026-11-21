@@ -4,12 +4,13 @@
   import Systems from "$lib/Systems.svelte";
   import Activity from "$lib/Activity.svelte";
   import { FlaskConical, ArrowUpRight } from "@lucide/svelte";
+  import { connection } from "$lib/connection.svelte";
 </script>
 
 <Header
   title="Dashboard"
   description="Container inventory, host health and recent operations."
-  ><span class="demo-tag"><FlaskConical size={13} />Demo mode</span></Header
+  ><span class="demo-tag">{#if connection.mode === "demo"}<FlaskConical size={13} />Demo mode{:else}<FlaskConical size={13} />Read-only local inventory{/if}</span></Header
 ><Metrics /><Systems />
 <div class="section-head">
   <h2>Recent activity</h2>

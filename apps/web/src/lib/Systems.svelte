@@ -10,8 +10,9 @@
     Clock3,
     SlidersHorizontal,
   } from "@lucide/svelte";
-  import { hosts, totals, type Host } from "./mock";
+  import { totals, type Host } from "./mock";
   import { demo, notify } from "./session.svelte";
+  import { connection } from "./connection.svelte";
   import Badge from "./ui/Badge.svelte";
   import Toolbar from "./ui/Toolbar.svelte";
   import Table from "./ui/Table.svelte";
@@ -30,7 +31,7 @@
   ];
   const symbols = [Monitor, Server, HardDrive, PowerOff];
   let rows = $derived(
-    hosts.filter(
+    demo.hosts.filter(
       (host) =>
         (!demo.host || demo.host === host.id) &&
         (status === "All statuses" ||
@@ -87,8 +88,8 @@
   ></Toolbar
 >
 {#if (demo.views.systems ?? "Tile") === "Tile"}<div class="host-grid">
-    {#each rows as host}{@const index = hosts.indexOf(host)}{@const Icon =
-        symbols[index]}{@const counts = totals(host.id, demo.containers)}
+    {#each rows as host}{@const index = demo.hosts.indexOf(host)}{@const Icon =
+        symbols[index % symbols.length]}{@const counts = totals(host.id, demo.containers)}
       <article
         class="host-card"
         class:offline={!host.online}
@@ -133,7 +134,7 @@
       </article>{:else}<p class="empty">No matching systems.</p>{/each}
   </div>{:else}<Table
     {rows}
-    columns={Object.keys(info(hosts[0]))}
+    columns={Object.keys(info(demo.hosts[0] ?? {} as Host))}
     value={(row, col) => info(row)[col]}
     >{#snippet cell(row, col)}{#if col === "Name"}<button
           class="link"
@@ -163,7 +164,7 @@
           notify("Active system changed");
         }}><Radio size={14} />Select system</button
       >{:else if tab === "Connection"}<label class="stack"
-        >Demo endpoint<input
+        >{connection.mode === "demo" ? "Demo endpoint" : "Middleware endpoint"}<input
           bind:value={address}
           placeholder={host.ip}
         /></label
@@ -174,6 +175,7 @@
           : "Docker inventory, Compose projects"}
       </p>
       <button
+        disabled={connection.mode !== "demo"}
         onclick={() => {
           demo.connections[host.id] = address;
           notify("Demo connection saved");
@@ -182,8 +184,8 @@
       >{:else}<Badge value={host.online ? "Healthy" : "Offline"} />
       <p>
         {host.online
-          ? "Demo agent reachable. Inventory and service checks passed."
-          : "Demo agent unreachable. No live telemetry available."}
+          ? connection.mode === "demo" ? "Demo agent reachable. Inventory and service checks passed." : "Local middleware reachable. Docker inventory is read-only."
+          : "Provider unreachable. No live telemetry available."}
       </p>{/if}</Modal
   >{/if}
 

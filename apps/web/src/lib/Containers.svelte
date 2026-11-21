@@ -9,6 +9,7 @@
     ScrollText,
   } from "@lucide/svelte";
   import { demo, hostName, operate } from "./session.svelte";
+  import { connection } from "./connection.svelte";
   import { projects, resourceId, type Container } from "./mock";
   import Badge from "./ui/Badge.svelte";
   import Table from "./ui/Table.svelte";
@@ -94,12 +95,13 @@
           class="icon"
           title={name + " " + item.name}
           aria-label={name + " " + item.name}
+          disabled={connection.mode !== "demo" && ["Start", "Stop", "Restart", "Logs", "Terminal"].includes(name)}
           onclick={() => action(item, name)}><Icon size={13} /></button
         >{/each}
     </div>{/snippet}
   {#if picked.length}<div class="toolbar">
       <strong>{picked.length} selected</strong
-      >{#each ["Start", "Stop", "Restart"] as name}<button
+      >{#each ["Start", "Stop", "Restart"] as name}<button disabled={connection.mode !== "demo"}
           onclick={() => {
             picked.forEach((item) => operate(item, name));
             selection = [];

@@ -4,7 +4,17 @@ ArchimedesOS is a planned Arch Linux-based, bare-metal operating system for appl
 
 **Planned stack:** Arch Linux, systemd, pacman, Btrfs, Docker Engine and Compose; SvelteKit (Svelte 5), TypeScript, Bun, ElysiaJS, SQLite, and JSON-RPC 2.0 over WebSockets.
 
-**Status:** Early development.
+**Status:** Early development. The dashboard can read local Docker inventory through the localhost middleware; other operations remain explicit demo features.
+
+## Preview and middleware
+
+```sh
+cd apps/middleware
+bun install --frozen-lockfile
+bun run start
+```
+
+In another terminal, run the web app as described below. Live mode is the default. Set `VITE_ARCHIMEDES_PROVIDER=demo` only for an explicit demo build.
 
 ## Preview the web UI
 

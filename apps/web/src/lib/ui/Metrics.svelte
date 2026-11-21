@@ -9,6 +9,7 @@
   } from "@lucide/svelte";
   import { totals } from "../mock";
   import { demo } from "../session.svelte";
+  import { connection } from "../connection.svelte";
   const labels = [
     "Running",
     "Stopped",
@@ -20,7 +21,7 @@
   const icons = [Play, Square, Box, Layers, Database, ArrowDownToLine];
   const colors = ["green", "amber", "cyan", "magenta", "violet", "amber"];
   let numbers = $derived(
-    totals(demo.host, demo.containers, demo.updates, demo.images, demo.volumes),
+    totals(demo.host, demo.containers, connection.mode === "demo" ? demo.updates : [], demo.images, demo.volumes),
   );
 </script>
 

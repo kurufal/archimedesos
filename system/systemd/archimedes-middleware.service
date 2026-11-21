@@ -1,0 +1,37 @@
+[Unit]
+Description=ArchimedesOS local Docker inventory middleware
+Wants=docker.service
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=archimedes
+Group=archimedes
+SupplementaryGroups=docker
+WorkingDirectory=/opt/archimedesos/apps/middleware
+Environment=NODE_ENV=production
+Environment=ARCHIMEDES_PROVIDER=docker
+Environment=DOCKER_SOCKET=/run/docker.sock
+Environment=ARCHIMEDES_MIDDLEWARE_PORT=4730
+ExecStart=/usr/bin/bun run src/index.ts
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET
+ReadOnlyPaths=/opt/archimedesos
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
